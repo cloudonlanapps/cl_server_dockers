@@ -1,0 +1,130 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: cl-server-mqtt-broker
+    ports:
+      - "1883:1883" # MQTT
+      - "9001:9001" # WebSocket
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "timeout 5 mosquitto_sub -t '$$SYS/#' -C 1 || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+  auth:
+    container_name: cl_auth
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        REPO_URL: https://github.com/cloudonlanapps/cl_server_auth_service.git
+        REPO_REF: main
+    ports:
+      - "8000:8000"
+    environment:
+      CL_SERVER_DIR: /data
+    volumes:
+      - ~/.data/cl_server_data_docker:/data
+    command: >
+      bash -c "
+      set -e &&
+      uv sync &&
+      uv run alembic upgrade head &&
+      uv run auth-server --port 8000
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  compute-server:
+    container_name: cl_compute_server
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        REPO_URL: https://github.com/cloudonlanapps/cl_server_compute_service.git
+        REPO_REF: main
+    ports:
+      - "8002:8002"
+    environment:
+      CL_SERVER_DIR: /data
+    volumes:
+      - ~/.data/cl_server_data_docker:/data
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    command: >
+      bash -c "
+      set -e &&
+      uv sync &&
+      uv run compute-migrate &&
+      uv run compute-server --port 8002
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  compute-worker:
+    container_name: cl_compute_worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        REPO_URL: https://github.com/cloudonlanapps/cl_server_compute_service.git
+        REPO_REF: main
+    environment:
+      CL_SERVER_DIR: /data
+      COMPUTE_SERVER_URL: http://compute-server:8002/
+    volumes:
+      - ~/.data/cl_server_data_docker:/data
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      compute-server:
+        condition: service_healthy
+    command: >
+      bash -c "
+      set -e &&
+      uv sync &&
+      uv run compute-worker \
+        --worker-id worker1-8002 \
+        --port 8002 \
+        --tasks clip_embedding,dino_embedding,exif,face_detection,face_embedding,hash,hls_streaming,image_conversion,media_thumbnail
+      "
+    restart: unless-stopped
+
+  store:
+    container_name: cl_store
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        REPO_URL: https://github.com/cloudonlanapps/cl_server_store_service.git
+        REPO_REF: main
+    ports:
+      - "8001:8001"
+    environment:
+      CL_SERVER_DIR: /data
+      AUTH_SERVER_URL: http://auth:8000/
+      COMPUTE_SERVER_URL: http://compute-server:8002/
+    volumes:
+      - ~/.data/cl_server_data_docker:/data
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+      compute-server:
+        condition: service_healthy
+    command: >
+      bash -c "
+      set -e &&
+      uv sync &&
+      uv run alembic upgrade head &&
+      uv run store --port 8001
+      "
