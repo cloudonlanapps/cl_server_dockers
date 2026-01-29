@@ -71,10 +71,20 @@ max_connections -1
 EOF
 fi
 
+# Detect docker-compose command (V1 standalone vs V2 plugin)
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+else
+    echo "❌ Error: Neither 'docker-compose' nor 'docker compose' found"
+    exit 1
+fi
+
 # Start MQTT broker container
 echo "📦 Starting MQTT broker container..."
 cd "$MQTT_DIR"
-docker-compose up -d
+$DOCKER_COMPOSE up -d
 
 # Wait for MQTT broker to be healthy
 echo "⏳ Waiting for MQTT broker to be ready..."
@@ -93,7 +103,7 @@ while [ $attempt -lt $max_attempts ]; do
         echo "📋 Logs: $CL_SERVER_DIR/mqtt/log/mosquitto.log"
         echo ""
         echo "To stop: $SCRIPT_DIR/mqtt_broker_stop"
-        echo "To view logs: cd $MQTT_DIR && docker-compose logs -f mosquitto"
+        echo "To view logs: cd $MQTT_DIR && $DOCKER_COMPOSE logs -f mosquitto"
         exit 0
     fi
     
@@ -102,5 +112,5 @@ while [ $attempt -lt $max_attempts ]; do
 done
 
 echo "❌ MQTT Broker failed to start within 60 seconds"
-echo "Check logs with: cd $MQTT_DIR && docker-compose logs mosquitto"
+echo "Check logs with: cd $MQTT_DIR && $DOCKER_COMPOSE logs mosquitto"
 exit 1

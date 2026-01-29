@@ -40,10 +40,20 @@ fi
 # Create data directory if it doesn't exist
 mkdir -p "$CL_SERVER_DIR/vector_store/qdrant"
 
+# Detect docker-compose command (V1 standalone vs V2 plugin)
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+else
+    echo "❌ Error: Neither 'docker-compose' nor 'docker compose' found"
+    exit 1
+fi
+
 # Start Qdrant container
 echo "📦 Starting Qdrant container..."
 cd "$QDRANT_DIR"
-docker-compose up -d
+$DOCKER_COMPOSE up -d
 
 # Wait for Qdrant to be healthy
 echo "⏳ Waiting for Qdrant to be ready..."

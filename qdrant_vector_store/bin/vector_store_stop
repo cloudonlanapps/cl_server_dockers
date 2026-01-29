@@ -11,6 +11,16 @@ QDRANT_DIR="$(dirname "$SCRIPT_DIR")"  # qdrant_docker directory
 
 echo "🛑 Stopping Qdrant Vector Store..."
 
+# Detect docker-compose command (V1 standalone vs V2 plugin)
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+else
+    echo "❌ Error: Neither 'docker-compose' nor 'docker compose' found"
+    exit 1
+fi
+
 # Check if container is running
 if ! docker ps | grep -q qdrant-vector-store; then
     echo "ℹ️  Qdrant container is not running"
@@ -20,12 +30,12 @@ fi
 # Stop Qdrant container
 echo "📦 Stopping Qdrant container..."
 cd "$QDRANT_DIR"
-docker-compose stop
+$DOCKER_COMPOSE stop
 
 echo "✅ Qdrant stopped successfully"
 echo ""
 echo "To start again: $SCRIPT_DIR/vector_store_start"
-echo "To remove container: cd $QDRANT_DIR && docker-compose down"
-echo "To view status: cd $QDRANT_DIR && docker-compose ps"
+echo "To remove container: cd $QDRANT_DIR && $DOCKER_COMPOSE down"
+echo "To view status: cd $QDRANT_DIR && $DOCKER_COMPOSE ps"
 
 

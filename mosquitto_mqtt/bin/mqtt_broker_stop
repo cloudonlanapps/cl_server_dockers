@@ -11,6 +11,16 @@ MQTT_DIR="$(dirname "$SCRIPT_DIR")"  # mqtt_broker directory
 
 echo "🛑 Stopping MQTT Broker..."
 
+# Detect docker-compose command (V1 standalone vs V2 plugin)
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+else
+    echo "❌ Error: Neither 'docker-compose' nor 'docker compose' found"
+    exit 1
+fi
+
 # Check if Docker is running
 if ! docker info > /dev/null 2>&1; then
     echo "❌ Error: Docker is not running"
@@ -19,6 +29,6 @@ fi
 
 # Stop MQTT broker container
 cd "$MQTT_DIR"
-docker-compose down
+$DOCKER_COMPOSE down
 
 echo "✅ MQTT Broker stopped successfully"

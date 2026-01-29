@@ -39,10 +39,20 @@ fi
 # Create data directory if it doesn't exist
 mkdir -p "$CL_SERVER_DIR/redis/data"
 
+# Detect docker-compose command (V1 standalone vs V2 plugin)
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+else
+    echo "❌ Error: Neither 'docker-compose' nor 'docker compose' found"
+    exit 1
+fi
+
 # Start Redis container
 echo "📦 Starting Redis container..."
 cd "$REDIS_DIR"
-docker-compose up -d
+$DOCKER_COMPOSE up -d
 
 # Wait for Redis to be healthy
 echo "⏳ Waiting for Redis to be ready..."
@@ -58,7 +68,7 @@ while [ $attempt -lt $max_attempts ]; do
         echo "💾 Data stored in: $CL_SERVER_DIR/redis/data"
         echo ""
         echo "To stop: $SCRIPT_DIR/redis_stop"
-        echo "To view logs: cd $REDIS_DIR && docker-compose logs -f redis"
+        echo "To view logs: cd $REDIS_DIR && $DOCKER_COMPOSE logs -f redis"
         exit 0
     fi
 
@@ -67,5 +77,5 @@ while [ $attempt -lt $max_attempts ]; do
 done
 
 echo "❌ Redis failed to start within 60 seconds"
-echo "Check logs with: cd $REDIS_DIR && docker-compose logs redis"
+echo "Check logs with: cd $REDIS_DIR && $DOCKER_COMPOSE logs redis"
 exit 1
