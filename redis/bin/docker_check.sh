@@ -17,9 +17,32 @@ ensure_docker_running() {
         return 0
     fi
 
-    echo "[*] Starting Docker Desktop…"
-    # macOS: launch Docker.app
-    open -a Docker
+    echo "[*] Starting Docker..."
+    OS="$(uname -s)"
+    if [ "$OS" = "Darwin" ]; then
+        # macOS: launch Docker.app
+        open -a Docker
+    elif [ "$OS" = "Linux" ]; then
+        # Linux: Check if running via systemctl first to avoid permission confusion
+        if command -v systemctl >/dev/null 2>&1; then
+            if systemctl is-active --quiet docker; then
+                echo "[!] Docker service is running, but 'docker info' failed."
+                echo "    This is likely a permission issue (user not in 'docker' group)."
+                return 1
+            fi
+            sudo systemctl start docker
+        elif command -v service >/dev/null 2>&1; then
+             if service docker status >/dev/null 2>&1; then
+                echo "[!] Docker service is running, but 'docker info' failed (permissions?)."
+                return 1
+             fi
+            sudo service docker start
+        else
+            echo "[!] Could not detect systemctl or service. Please start Docker manually."
+        fi
+    else
+        echo "[!] OS not supported for auto-start. Please start Docker manually."
+    fi
 
     echo "[*] Waiting for Docker to initialize…"
 
@@ -43,3 +66,5 @@ ensure_docker_running() {
     echo "[✓] Docker is ready"
     return 0
 }
+
+ensure_docker_running
